@@ -57,13 +57,23 @@
         .btn-red { background: #ef4444; width: auto; padding: 8px 12px; border-radius: 8px; } 
         .btn-cam { background: #f59e0b; width: 55px; font-size: 1.3rem; }
         
-        /* Excel Butonu Stili */
+        /* GÜNCELLENMİŞ EXCEL BUTONU STİLİ */
         .btn-excel {
-            background: #16a34a; color: white; border: none; padding: 5px 10px; 
-            border-radius: 8px; font-size: 0.8rem; cursor: pointer; float: right; 
-            display: flex; align-items: center; gap: 5px;
+            background: linear-gradient(135deg, #16a34a, #15803d);
+            color: white; 
+            border: none; 
+            padding: 10px 20px; 
+            border-radius: 12px; 
+            font-size: 0.9rem; 
+            cursor: pointer; 
+            display: inline-flex; 
+            align-items: center; 
+            gap: 8px;
+            font-weight: bold;
+            box-shadow: 0 4px 12px rgba(22, 163, 74, 0.3);
+            transition: transform 0.2s;
         }
-        .btn-excel:hover { background: #15803d; }
+        .btn-excel:active { transform: scale(0.95); }
 
         table { width: 100%; border-collapse: separate; border-spacing: 0 10px; font-size: 0.9rem; } 
         td, th { padding: 15px; } 
@@ -261,7 +271,8 @@
             <table id="recentReturnsTable"><tr><td class="loading">Veriler çekiliyor...</td></tr></table>
         </div>
     </div>
-<div id="books" class="page">
+
+    <div id="books" class="page">
         <h2>Kitap İşlemleri</h2>
         <div class="card">
             <div style="display:flex; gap:10px;">
@@ -284,8 +295,10 @@
             <input type="text" id="bookSearch" placeholder="Kitap, kategori veya raf ara..." onkeyup="searchBooks(this.value)">
         </div>
 
-        <div style="text-align:right; margin-bottom:10px;">
-            <button class="btn-excel" onclick="exportToExcel('stock')"><i class="fas fa-file-excel"></i> Tüm Stoğu İndir</button>
+        <div style="display:flex; justify-content: flex-end; margin-bottom: 15px;">
+            <button class="btn-excel" onclick="exportToExcel('stock')">
+                <i class="fas fa-file-excel"></i> Tüm Stoğu Excel İndir
+            </button>
         </div>
 
         <div class="card">
@@ -525,7 +538,7 @@
             }
         });
 
-        // 3. KATEGORİ ANALİZİ (GÜNCELLENDİ)
+        // 3. KATEGORİ ANALİZİ
         const catCounts = {};
         allData.books.forEach(b => {
             // "Kategori - Raf" stringinden sadece kategoriyi al
@@ -671,7 +684,6 @@
     async function sendApi(type) {
         let payload = {};
         if(type === 'addBook') {
-            // HEM SEÇİLEN HEM YAZILAN DEĞERİ ALMAK İÇİN INPUT VALUE KULLANIYORUZ
             const cat = document.getElementById('bCategory').value;
             const shelfNo = document.getElementById('bShelfNo').value;
             
