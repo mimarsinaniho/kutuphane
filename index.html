@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mimar Sinan İHO Kütüphane</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f8fafc; margin: 0; display: flex; flex-direction: column; height: 100vh; color: #1e293b; }
+        
+        /* HEADER */
+        .header-school { 
+            background: white;
+            padding: 10px 20px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05); 
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        #school-svg { height: 90px; width: auto; }
+
+        .module-title {
+            color: #0c8e8b;
+            font-weight: 800;
+            font-size: 1.2rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-align: right;
+        }
+
+        .main { flex: 1; padding: 20px; overflow-y: auto; padding-bottom: 100px; }
+        .page { display: none; animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1); } 
+        .page.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .card { background: white; padding: 20px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.03); margin-bottom: 25px; border: 1px solid #e2e8f0; position: relative; }
+        
+        .bottom-nav { position: fixed; bottom: 20px; left: 5%; width: 90%; background: white; border-radius: 25px; display: flex; justify-content: space-around; padding: 15px 0; z-index: 500; box-shadow: 0 10px 40px rgba(30, 64, 175, 0.15); border: 1px solid #e5e7eb; }
+        .nav-item { text-align: center; color: #94a3b8; font-size: 0.85rem; cursor: pointer; padding: 5px 15px; border-radius: 15px; transition: all 0.3s; } 
+        .nav-item i { display: block; font-size: 1.4rem; margin-bottom: 4px; }
+        .nav-item.active { color: #1e40af; background-color: #eff6ff; font-weight: bold; transform: translateY(-3px); }
+        
+        input, select { width: 100%; padding: 14px; margin-bottom: 12px; border: 1px solid #cbd5e1; border-radius: 12px; box-sizing: border-box; font-size: 0.95rem; transition: 0.3s; appearance: none; background-color: white; }
+        input:focus, select:focus { border-color: #1e40af; outline: none; box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.1); }
+        
+        .btn { padding: 14px; border: none; border-radius: 12px; cursor: pointer; width: 100%; font-weight: bold; color: white; font-size: 1rem; transition: 0.2s; }
+        .btn:active { transform: scale(0.98); }
+        .btn-blue { background: linear-gradient(135deg, #1e40af, #2563eb); } 
+        .btn-green { background: linear-gradient(135deg, #059669, #10b981); } 
+        .btn-red { background: #ef4444; width: auto; padding: 8px 12px; border-radius: 8px; } 
+        .btn-cam { background: #f59e0b; width: 55px; font-size: 1.3rem; }
+        
+        /* Excel Butonu Stili */
+        .btn-excel {
+            background: #16a34a; color: white; border: none; padding: 5px 10px; 
+            border-radius: 8px; font-size: 0.8rem; cursor: pointer; float: right; 
+            display: flex; align-items: center; gap: 5px;
+        }
+        .btn-excel:hover { background: #15803d; }
+
+        table { width: 100%; border-collapse: separate; border-spacing: 0 10px; font-size: 0.9rem; } 
+        td, th { padding: 15px; } 
+        tr { background: #f8fafc; border-radius: 10px; }
+        
+        #scanner-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 1000; display: none; flex-direction: column; justify-content: center; align-items: center; }
+        #reader { width: 100%; max-width: 500px; border-radius: 20px; overflow: hidden; }
+        
+        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .stat-card { text-align: center; padding: 20px; border-radius: 20px; color: white; box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
+        .bg-purple { background: linear-gradient(135deg, #8b5cf6, #7c3aed); } 
+        .bg-orange { background: linear-gradient(135deg, #f97316, #ea580c); } 
+        .bg-blue { background: linear-gradient(135deg, #3b82f6, #2563eb); } 
+        .bg-green { background: linear-gradient(135deg, #10b981, #059669); }
+        .loading { text-align:center; padding:20px; color:#64748b; font-style:italic; }
+        
+        .chart-container { position: relative; height: 250px; width: 100%; margin-bottom: 20px; }
+
+        .shelf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+        .shelf-box { background: #f1f5f9; padding: 15px; border-radius: 12px; text-align: center; border: 1px solid #cbd5e1; }
+        .shelf-box h4 { margin: 0; color: #64748b; font-size: 0.8rem; text-transform: uppercase; word-wrap: break-word; }
+        .shelf-box span { display: block; font-size: 1.5rem; font-weight: bold; color: #1e40af; margin-top: 5px; }
+
+        /* ARAMA KUTUSU STİLİ */
+        .search-wrapper { position: relative; margin-bottom: 15px; }
+        .search-wrapper i { position: absolute; top: 50%; left: 15px; transform: translateY(-50%); color: #94a3b8; font-size: 1.1rem; }
+        .search-wrapper input { padding-left: 45px; border-radius: 50px; border: 2px solid #e2e8f0; margin-bottom: 0; }
+        .search-wrapper input:focus { border-color: #3b82f6; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.1); }
+
+        /* MOBİL UYUM */
+        @media (max-width: 768px) {
+            .stat-grid { grid-template-columns: 1fr; } 
+            .header-school { flex-direction: row; }
+            #school-svg { height: 70px; }
+            .module-title { font-size: 0.9rem; }
+        }
+        
+        .doughnut-inner {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center; font-weight: bold; color: #1e293b;
+        }
+        .doughnut-inner span { font-size: 1.5rem; display: block; }
+        .doughnut-inner small { font-size: 0.8rem; color: #64748b; }
+
+        /* POP-UP STİLLERİ */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px);
+            z-index: 2000; display: none; align-items: center; justify-content: center;
+            opacity: 0; transition: opacity 0.3s ease;
+        }
+        .modal-overlay.open { display: flex; opacity: 1; }
+        
+        .modal-box {
+            background: white; width: 90%; max-width: 350px;
+            border-radius: 20px; padding: 25px;
+            text-align: center; transform: scale(0.8);
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+        }
+        .modal-overlay.open .modal-box { transform: scale(1); }
+
+        .modal-icon {
+            width: 60px; height: 60px; border-radius: 50%;
+            margin: 0 auto 15px auto; display: flex; align-items: center; justify-content: center;
+            font-size: 30px;
+        }
+        .icon-success { background: #dcfce7; color: #10b981; }
+        .icon-error { background: #fee2e2; color: #ef4444; }
+        .icon-confirm { background: #dbeafe; color: #1e40af; }
+
+        .modal-title { font-size: 1.2rem; font-weight: 800; color: #1e293b; margin-bottom: 10px; }
+        .modal-msg { font-size: 0.95rem; color: #64748b; margin-bottom: 20px; line-height: 1.5; }
+        
+        .modal-actions { display: flex; gap: 10px; justify-content: center; }
+        .modal-btn { flex: 1; padding: 12px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; font-size: 1rem; }
+        .btn-ok { background: #1e293b; color: white; }
+        .btn-cancel { background: #e2e8f0; color: #475569; }
+    </style>
+</head>
+<body>
+
+<div id="customModal" class="modal-overlay">
+    <div class="modal-box">
+        <div id="mIcon" class="modal-icon icon-success"><i class="fas fa-check"></i></div>
+        <div id="mTitle" class="modal-title">Başarılı</div>
+        <div id="mMsg" class="modal-msg">İşlem tamamlandı.</div>
+        <div id="mActions" class="modal-actions">
+            </div>
+    </div>
+</div>
+
+<div class="header-school">
+    <svg id="school-svg" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 595.28 304.94">
+      <defs>
+        <style>
+          .st0 { font-family: Antonio-Light, Antonio; font-weight: 300; }
+          .st1 { fill: #0c8e8b; }
+          .st2 { font-family: Antonio-Bold, Antonio; font-weight: 700; }
+          .st3 { fill: #494949; font-size: 38.31px; }
+        </style>
+      </defs>
+      <g>
+        <path class="st1" d="M240.54,39.54c-1.86,2.33-2.81,5.6-3.7,8.46-9.91,31.76,2.19,67.53,14.81,96.89,13.03,30.3,38.62,61.81,17.01,94.91-11.77,18.03-33.55,28.44-54.9,28.78l6.88-2.1c29.78-11.02,45.6-31.52,41.35-64.27-2.67-20.58-14.73-36.83-22.92-55.31-7.66-17.27-13.43-36.1-15.09-55.04-.72-8.2.16-16.01.53-24.13-1.31,3.27-2.12,7.59-2.6,11.15-3.07,22.76,3.68,51.53,12.12,72.71,8.9,22.31,18.84,36.85,17.45,62.58-2.08,38.41-45.39,62.97-80.64,51.71-44.7-14.29-53.71-53.06-36.08-93.72,13.24-30.53,26.67-62.02,20.75-96.39l-2.36-8.73,1.07,13.55c.14,21.57-5.16,43.16-13.7,62.8-8.47,19.49-21.87,37.71-24.68,59.18-3.78,28.82,8.35,49.33,34.5,60.9l15.14,5.47c-7.63-.88-15.06-1.39-22.38-3.87-23.62-7.99-43.3-28.95-42.12-55.17.87-19.19,11.76-35.44,19.7-52.19,14.94-31.52,32.51-77.51,19.7-111.92-.84-2.26-2.13-4.4-3.08-6.6,13.07,9.72,24.34,22.01,28.64,38.13,5.07,19.01.81,41.28-4.43,59.9-8.85,31.46-34.93,68.84-16.17,101.29,6.93,11.99,29.99,27.15,43.93,27.17,13.54.02,36.42-15.23,43.23-26.82,19.11-32.57-7.65-70.76-16.24-102.28-5.77-21.18-10.49-47.36-1.15-68.04,4.56-10.1,13.95-20.58,22.61-27.43.45-.36,2.3-1.99,2.82-1.58Z"/>
+        <path class="st1" d="M227.85,179.42l-8.35-6.98c-19.24-13.84-46.53-13.41-64.6,2.22l-4.58,4.23c5.78-25.67,32.7-35.7,56.12-26.16,11.32,4.61,18.28,15.23,21.4,26.69Z"/>
+        <path class="st1" d="M205.65,203.04c8.31.38,23.57,5.25,14.63,15.86-2.66,3.16-6.11,4.57-9.52,6.67,1.04,4.35,3.11,8.46,1.69,12.99-1.83,5.82-9.28,4.62-13.83,3.05-1.15-.4-4.95-2.51-5.48-2.49-1.01.04-4.33,4.03-5.49,4.94-1.83,1.44-5.94,3.77-8.25,3.76-7.44-.04-9.09-10.56-9.03-16.19-5.05-1.06-15.48-3.26-15.11-10.08.3-5.5,7.04-9.22,11.25-11.63-8.34-16.93,3.16-23.07,17.43-13.95,3.25-3.94,9.45-9.83,15.04-8.63s6.84,10.86,6.67,15.7ZM204.6,202.69c-.5-4.08-.05-8.55-2.53-12.1-3.68-5.27-10.2-.19-13.34,3.1-.55.58-2.78,3.04-2.42,3.67.14.24,3.78,2.53,4.5,3.07.59.45,2.17,2.25,2.33,2.25h11.45ZM169.62,192.55c-3.77.64-5.12,4.36-4.8,7.8.13,1.36,2.18,8.76,3.35,8.98,2.06-1.64,8.07-2.3,9.63-3.66,1.33-1.15,3.2-7.01,5.29-8.45-3.4-2.34-9.26-5.39-13.48-4.67ZM180.99,205.15c2.76-1.46,5.95-1.69,8.99-2.11.34-.05,1.24-.14,1.22-.54-.02-.36-5.26-3.58-5.81-4.39-.54,0-4.8,6.55-4.4,7.03ZM204.25,204.8c-2.71-.19-5.42-.73-8.11,0,1.85,3.11,5.51,4.99,6.7,8.45l.99-4.11.41-4.35ZM218.92,209.51c-3.12-3.17-9.03-4.14-13.26-4.71-.24.26-.28,4.32-.39,5.08-.18,1.2-1.22,3.93-.97,4.89.13.51,1.59,1.93,2,2.61.56.93,2.69,5.34,3.22,5.6,4.01-1.56,14.17-8.6,9.4-13.46ZM189.02,205.26c-1.34.13-8.56,1.45-9.25,2.02-.61.5-2.99,6.09-3.37,7.2-.5,1.46-1.67,5.22-1.21,6.51.14.39.75,1.06,1.05,1.43.96,1.19,6.89,7.35,7.88,7.57,2.43-.34,12.74-1.45,14.14-2.82.22-.22,2.12-4.96,2.39-5.72.55-1.55,2.25-6.05,1.51-7.33-.45-.77-7.33-8.29-7.93-8.64-1.1-.63-3.85-.36-5.2-.23ZM176.41,208.33l-7.4,2.47c-.3.41,2.94,5.97,3.7,6.69l3.7-9.16ZM170.77,230.17c0-.75-.06-1.5.04-2.25.2-1.51,1.36-6.08,1.26-7.04-.05-.48-3.97-7.48-4.56-8.43-.22-.36-.17-.58-.73-.56-.76.04-4.49,2.25-5.3,2.83-1.83,1.31-5.68,5.02-5.45,7.43.52,5.38,10.27,7.99,14.73,8.01ZM208.12,223.82c-1.27-2.49-2.29-5.34-4.22-7.39l-3.52,10.57,7.75-3.18ZM173.76,230.52c1.54.48,5.39-.35,7.22,0l-3.7-3.52c-.56-.45-2.59-3.81-2.82-3.88-.8-.25-.43.5-.51.89-.23,1.13-1.33,6.16-.19,6.51ZM194.39,237.91c4.12,2.1,12.04,6.1,16.18,2.29,2.48-2.28.94-11.25-.87-13.55-.7-.89-4.42,1.13-5.54,1.51-1.72.57-3.49.88-5.19,1.51-.36,1.35-4.99,7.66-4.58,8.25ZM186.63,231.94c.53.94,5.54,4.64,6.12,4.53.99-.57,3.95-5.55,3.39-6.3l-9.51,1.77ZM191.54,237.94c-.04-.06-.96-.27-1.37-.56-2.34-1.65-4.69-3.29-6.97-5.02l-9.93-.39c-1.18,8.26,2.2,19.04,12.26,12.44,1.26-.83,4.93-4.08,5.69-5.24.22-.33.55-.9.32-1.23Z"/>
+        <path class="st1" d="M186.98,127.63c-.73,1.82-1.7,3.47-.02,5.13,1.96,1.93,5.42.51,4.96-2.31.71.11-.03,1.09,1.05.35.52,1.37-1.53,3.45-.74,4.43.29.37,7.18,2.35,8.62,3.03,6.94,3.24,12.38,9.54,15.38,16.51-15.36-10.08-34.39-12.19-50.49-2.4l-4.47,3.1c3-7.77,8.73-14.25,16.44-17.57,2.54-1.09,5.13-1.62,7.73-2.5.33-.48-.79-2.13-.89-3.05-.18-1.66.51-4.35,2.44-4.72Z"/>
+        <path class="st1" d="M189.09,37.42l-5.12,2.1c-5.11,2.76-4.69,10.57-.49,13.9,5.47,4.33,12.99,2.31,15.13-4.37.62-.09.36.81.31,1.19-1.56,12.64-25.56,12.94-23.19-4.51.4-2.93,5.49-8.31,8.25-8.31h5.11Z"/>
+        <path class="st1" d="M199.31,36.01c.01,1.01-.67,1.82-.18,2.82s2.21.76,2.65,1.76c-2.85-.18-3.73-.31-3.88,2.82-.87-.38-.69-2.11-1.64-2.42s-2.26.55-3.29.31c2.06-1.73,2.76-2.01,1.06-4.57,1.05-.24,1.77,1.07,2.65,1.05,1.08-.03,1.43-1.85,2.63-1.76Z"/>
+        <path class="st1" d="M184.63,213.73c2.52-2.51,8.17-1.63,8.97,1.89,1.12,4.97-2.28,7.8-7.08,6.72-3.57-.8-4.46-6.06-1.89-8.62Z"/>
+      </g>
+      <text class="st3" transform="translate(308.38 100.57)"><tspan class="st0"><tspan x="0" y="0">SULTANGAZİ</tspan></tspan><tspan class="st2"><tspan x="0" y="45.98">MİMAR SİNAN</tspan></tspan><tspan class="st2"><tspan x="0" y="91.95">İMAM HATİP </tspan></tspan><tspan class="st2"><tspan x="0" y="137.93">ORTAOKULU</tspan></tspan></text>
+    </svg>
+    
+    <div class="module-title">Kütüphane<br>Modülü</div>
+</div>
+
+<div id="scanner-overlay">
+    <h3 style="color:white; margin-bottom:20px;">Barkodu Hizalayın</h3>
+    <div id="reader"></div>
+    <button onclick="stopScanner()" style="margin-top:30px; padding:12px 30px; background:#ef4444; border:none; color:white; border-radius:25px;">KAPAT</button>
+</div>
+
+<datalist id="classOptions"></datalist>
+<datalist id="categoryOptions"></datalist>
+<datalist id="shelfOptions">
+    <option value="Raf 1">
+    <option value="Raf 2">
+    <option value="Raf 3">
+    <option value="Raf 4">
+    <option value="Raf 5">
+    <option value="Raf 6">
+    <option value="Raf 7">
+    <option value="Raf 8">
+    <option value="Raf 9">
+    <option value="Raf 10">
+</datalist>
+
+<div class="main">
+    <div id="dashboard" class="page active">
+        <h2>Kütüphane Analiz Paneli</h2>
+        <div class="stat-grid">
+            <div class="stat-card bg-purple"><small>TOPLAM</small><h1 id="stat-total">0</h1></div>
+            <div class="stat-card bg-orange"><small>ÖDÜNÇTE</small><h1 id="stat-loan">0</h1></div>
+            <div class="stat-card bg-green"><small>İADE</small><h1 id="stat-returned">0</h1></div>
+            <div class="stat-card bg-blue"><small>OKUYUCU</small><h1 id="stat-students">0</h1></div>
+        </div>
+
+        <div class="stat-grid">
+            <div class="card">
+                <h3>🏆 En Çok Okunanlar</h3>
+                <div class="chart-container" style="height:250px">
+                    <canvas id="topBooksChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h3>📊 Doluluk Oranı</h3>
+                <div class="chart-container" style="height:250px; display:flex; justify-content:center; align-items:center; position:relative;">
+                    <canvas id="occupancyChart"></canvas>
+                    <div class="doughnut-inner" id="occupancyText">
+                        <span>0 / 0</span>
+                        <small>Kitap</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>📂 Kategori Analizi (Stok)</h3>
+            <div id="categoryStats" class="shelf-grid">
+                <div class="loading">Kategoriler taranıyor...</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <h3 style="margin:0;">🌟 En Çok Okuyanlar</h3>
+                <button class="btn-excel" onclick="exportToExcel('topStudents')"><i class="fas fa-file-excel"></i> İndir</button>
+            </div>
+            <table id="topStudentsTable"><tr><td class="loading">Veriler çekiliyor...</td></tr></table>
+        </div>
+        
+        <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <h3 style="margin:0;">⚠️ Gecikenler (+15 Gün)</h3>
+                <button class="btn-excel" onclick="exportToExcel('overdue')"><i class="fas fa-file-excel"></i> İndir</button>
+            </div>
+            <table id="overdueTable"><tr><td class="loading">Hesaplanıyor...</td></tr></table>
+        </div>
+
+        <div class="card">
+            <h3>⏱️ Son İadeler ve Okuma Süreleri</h3>
+            <table id="recentReturnsTable"><tr><td class="loading">Veriler çekiliyor...</td></tr></table>
+        </div>
+    </div>
+<div id="books" class="page">
+        <h2>Kitap İşlemleri</h2>
+        <div class="card">
+            <div style="display:flex; gap:10px;">
+                <input id="bBarcode" placeholder="Barkod / ISBN" onchange="fetchGoogleBook(this.value)">
+                <button class="btn btn-cam" onclick="startScan('bBarcode')"><i class="fas fa-barcode"></i></button>
+            </div>
+            <input id="bTitle" placeholder="Kitap Adı">
+            
+            <div style="display:flex; gap:10px;">
+                <input list="categoryOptions" id="bCategory" placeholder="Kategori Seç/Yaz">
+                <input list="shelfOptions" id="bShelfNo" placeholder="Raf Seç/Yaz" style="width:140px;">
+            </div>
+
+            <input id="bStock" type="number" placeholder="Stok" value="1">
+            <button class="btn btn-blue" onclick="sendApi('addBook')">Kaydet</button>
+        </div>
+        
+        <div class="search-wrapper">
+            <i class="fas fa-search"></i>
+            <input type="text" id="bookSearch" placeholder="Kitap, kategori veya raf ara..." onkeyup="searchBooks(this.value)">
+        </div>
+
+        <div style="text-align:right; margin-bottom:10px;">
+            <button class="btn-excel" onclick="exportToExcel('stock')"><i class="fas fa-file-excel"></i> Tüm Stoğu İndir</button>
+        </div>
+
+        <div class="card">
+            <table id="bookTable"><tr><td class="loading">Yükleniyor...</td></tr></table>
+        </div>
+    </div>
+
+    <div id="loans" class="page">
+        <h2>Ödünç İşlemleri</h2>
+        <div class="card" style="background:#f0f9ff; border:1px solid #bae6fd;">
+            <input id="lStudent" placeholder="Öğrenci Ad Soyad">
+            <div style="display:flex; gap:10px;">
+                <input id="lNo" type="number" placeholder="No">
+                <input list="classOptions" id="lClass" placeholder="Sınıf Seç">
+            </div>
+            <div style="display:flex; gap:10px;">
+                <input id="lBarcode" placeholder="Kitap Barkod">
+                <button class="btn btn-cam" onclick="startScan('lBarcode')"><i class="fas fa-barcode"></i></button>
+            </div>
+            <button class="btn btn-blue" onclick="sendApi('loanBook')">Ödünç Ver</button>
+        </div>
+
+        <h3>Teslim Bekleyenler</h3>
+        <div class="search-wrapper">
+            <i class="fas fa-search"></i>
+            <input type="text" id="loanSearch" placeholder="Öğrenci veya kitap ara..." onkeyup="searchLoans(this.value)">
+        </div>
+
+        <div class="card">
+            <table id="loanTable"><tr><td class="loading">Yükleniyor...</td></tr></table>
+        </div>
+    </div>
+</div>
+
+<div class="bottom-nav">
+    <div class="nav-item active" onclick="nav('dashboard', this)"><i class="fas fa-chart-pie"></i> Analiz</div>
+    <div class="nav-item" onclick="nav('books', this)"><i class="fas fa-book"></i> Kitaplar</div>
+    <div class="nav-item" onclick="nav('loans', this)"><i class="fas fa-hand-holding-heart"></i> Ödünç</div>
+</div>
+
+<script>
+    const API_URL = "https://script.google.com/macros/s/AKfycbwJWBrOoVwtwqq0kVD1Cev2LYIdYagYHzIvewtOF62PQD0-pZu_-dLCToGOKDStYxz9/exec";
+    
+    let allData = { books: [], loans: [], students: [] };
+    let topBooksChart = null, occupancyChart = null;
+
+    // --- UI POP-UP FONKSİYONLARI ---
+    const modal = document.getElementById('customModal');
+    const mIcon = document.getElementById('mIcon');
+    const mTitle = document.getElementById('mTitle');
+    const mMsg = document.getElementById('mMsg');
+    const mActions = document.getElementById('mActions');
+
+    function uiAlert(msg, type='success') {
+        return new Promise(resolve => {
+            mMsg.innerText = msg;
+            mActions.innerHTML = ''; 
+            
+            if(type === 'success') {
+                mIcon.className = 'modal-icon icon-success';
+                mIcon.innerHTML = '<i class="fas fa-check"></i>';
+                mTitle.innerText = "Başarılı";
+            } else {
+                mIcon.className = 'modal-icon icon-error';
+                mIcon.innerHTML = '<i class="fas fa-exclamation"></i>';
+                mTitle.innerText = "Hata";
+            }
+            
+            let btn = document.createElement('button');
+            btn.className = 'modal-btn btn-ok';
+            btn.innerText = 'Tamam';
+            btn.onclick = () => { modal.classList.remove('open'); resolve(); };
+            mActions.appendChild(btn);
+
+            modal.classList.add('open');
+        });
+    }
+
+    function uiConfirm(msg) {
+        return new Promise(resolve => {
+            mMsg.innerText = msg;
+            mActions.innerHTML = '';
+            
+            mIcon.className = 'modal-icon icon-confirm';
+            mIcon.innerHTML = '<i class="fas fa-question"></i>';
+            mTitle.innerText = "Emin misiniz?";
+            
+            let btnYes = document.createElement('button');
+            btnYes.className = 'modal-btn btn-ok'; 
+            btnYes.innerText = 'Evet';
+            btnYes.onclick = () => { modal.classList.remove('open'); resolve(true); };
+            
+            let btnNo = document.createElement('button');
+            btnNo.className = 'modal-btn btn-cancel'; 
+            btnNo.innerText = 'Hayır';
+            btnNo.onclick = () => { modal.classList.remove('open'); resolve(false); };
+            
+            mActions.appendChild(btnNo);
+            mActions.appendChild(btnYes);
+
+            modal.classList.add('open');
+        });
+    }
+
+    window.onload = function() {
+        generateClassOptions();
+        generateCategoryOptions(); 
+        refreshData();
+    };
+
+    function generateClassOptions() {
+        const list = document.getElementById('classOptions');
+        const grades = [5, 6, 7, 8];
+        const branches = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
+        grades.forEach(g => branches.forEach(b => {
+            let opt = document.createElement('option');
+            opt.value = g + "/" + b;
+            list.appendChild(opt);
+        }));
+    }
+
+    function generateCategoryOptions() {
+        const list = document.getElementById('categoryOptions');
+        const categories = [
+            "Dini Kitaplar", "Roman", "Hikaye", "Tarih", "Bilim Kurgu", 
+            "Ansiklopedi", "Kişisel Gelişim", "Dünya Klasikleri", "Dergi",
+            "Felsefe", "Şiir", "Biyografi", "Sınav Hazırlık", "Çizgi Roman"
+        ];
+        
+        categories.sort().forEach(cat => {
+            let opt = document.createElement('option');
+            opt.value = cat;
+            list.appendChild(opt);
+        });
+    }
+
+    async function callBackend(action, data = {}) {
+        data.action = action;
+        const activePage = document.querySelector('.page.active');
+        if(activePage) activePage.style.opacity = "0.6";
+        document.body.style.cursor = "wait";
+
+        try {
+            const response = await fetch(API_URL, {
+                method: "POST",
+                redirect: "follow",
+                headers: { "Content-Type": "text/plain;charset=utf-8" },
+                body: JSON.stringify(data)
+            });
+            const result = await response.json();
+            
+            if(activePage) activePage.style.opacity = "1";
+            document.body.style.cursor = "default";
+            
+            if(result.error) { uiAlert("Sunucu Hatası: " + result.error, 'error'); return null; }
+            return result;
+        } catch (error) {
+            uiAlert("Bağlantı Hatası: " + error, 'error');
+            if(activePage) activePage.style.opacity = "1";
+            document.body.style.cursor = "default";
+            return null;
+        }
+    }
+
+    async function refreshData() {
+        const data = await callBackend('getAllData');
+        if(data) {
+            allData = data;
+            renderDashboard();
+            renderBooks(allData.books); 
+            renderLoans(allData.loans); 
+        }
+    }
+
+    function renderDashboard() {
+        const totalStock = allData.books.reduce((acc, b) => acc + parseInt(b.stock || 0), 0);
+        const activeLoans = allData.loans.filter(l => l.status === 'out' || l.status === 'Ödünçte').length;
+        const returnedLoans = allData.loans.filter(l => l.status === 'returned' || l.status === 'İade Edildi');
+        
+        document.getElementById('stat-total').innerText = totalStock + activeLoans;
+        document.getElementById('stat-loan').innerText = activeLoans;
+        document.getElementById('stat-returned').innerText = returnedLoans.length;
+        document.getElementById('stat-students').innerText = allData.students.length;
+
+        // 1. EN ÇOK OKUNANLAR
+        const bookCounts = {};
+        allData.loans.forEach(l => {
+            bookCounts[l.title] = (bookCounts[l.title] || 0) + 1;
+        });
+        const sortedBooks = Object.entries(bookCounts).sort((a,b) => b[1] - a[1]).slice(0, 5); 
+        
+        const ctxTop = document.getElementById('topBooksChart').getContext('2d');
+        if(topBooksChart) topBooksChart.destroy();
+        topBooksChart = new Chart(ctxTop, {
+            type: 'bar',
+            data: {
+                labels: sortedBooks.map(x => x[0].substring(0, 15) + '...'),
+                datasets: [{
+                    label: 'Okunma',
+                    data: sortedBooks.map(x => x[1]),
+                    backgroundColor: '#3b82f6',
+                    borderRadius: 5
+                }]
+            },
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false, 
+                indexAxis: 'y',
+                scales: { x: { ticks: { stepSize: 1 } } } 
+            }
+        });
+
+        // 2. DOLULUK ORANI
+        const totalCapacity = totalStock + activeLoans;
+        
+        document.querySelector('#occupancyText span').innerText = `${activeLoans} / ${totalCapacity}`;
+
+        const ctxOcc = document.getElementById('occupancyChart').getContext('2d');
+        if(occupancyChart) occupancyChart.destroy();
+        occupancyChart = new Chart(ctxOcc, {
+            type: 'doughnut',
+            data: {
+                labels: ['Ödünçte', 'Rafta'],
+                datasets: [{
+                    data: [activeLoans, totalStock],
+                    backgroundColor: ['#f97316', '#e2e8f0'],
+                    borderWidth: 0,
+                    circumference: 180, 
+                    rotation: 270
+                }]
+            },
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                cutout: '75%'
+            }
+        });
+
+        // 3. KATEGORİ ANALİZİ (GÜNCELLENDİ)
+        const catCounts = {};
+        allData.books.forEach(b => {
+            // "Kategori - Raf" stringinden sadece kategoriyi al
+            let s = b.shelf ? b.shelf : "DİĞER";
+            let mainCat = s.split('-')[0].trim();
+            if(!mainCat) mainCat = "BELİRSİZ";
+            catCounts[mainCat] = (catCounts[mainCat] || 0) + parseInt(b.stock || 1);
+        });
+        
+        const shelfContainer = document.getElementById('categoryStats');
+        shelfContainer.innerHTML = "";
+        Object.entries(catCounts).forEach(([name, count]) => {
+            shelfContainer.innerHTML += `<div class="shelf-box"><h4>${name}</h4><span>${count}</span></div>`;
+        });
+
+        // 4. EN ÇOK OKUYANLAR
+        let topStudents = [...allData.students].sort((a,b) => (parseInt(b.score)||0) - (parseInt(a.score)||0)).slice(0,5);
+        let studentHtml = "";
+        topStudents.forEach(s => {
+            let puan = s.score || 0;
+            studentHtml += `<tr><td><b>${s.name}</b> (${s.sClass})</td><td style="color:#10b981; font-weight:bold">${puan} Puan</td></tr>`;
+        });
+        document.getElementById('topStudentsTable').innerHTML = studentHtml || "<tr><td>Veri yok</td></tr>";
+
+        // 5. SON İADELER
+        const recentReturns = returnedLoans.sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 10);
+        let returnsHtml = "";
+        recentReturns.forEach(l => {
+            let duration = l.duration || 1;
+            returnsHtml += `<tr><td><b>${l.title}</b><br><small>${l.student}</small></td><td style="text-align:right;"><span style="background:#dcfce7; color:#166534; padding:4px 8px; border-radius:8px; font-weight:bold; font-size:0.8rem;">${duration} Gün</span></td></tr>`;
+        });
+        document.getElementById('recentReturnsTable').innerHTML = returnsHtml || "<tr><td>Henüz iade yok</td></tr>";
+
+        // GECİKENLER
+        const now = new Date();
+        let overdueHtml = "";
+        allData.loans.filter(l => l.status === 'out' || l.status === 'Ödünçte').forEach(l => {
+            const diffDays = Math.floor((now - new Date(l.date)) / (86400000));
+            if(diffDays > 15) {
+                overdueHtml += `<tr><td style="color:#ef4444"><b>${l.student}</b> (${l.sClass})<br><small>${l.title}</small></td><td style="color:#ef4444; font-weight:bold">${diffDays} Gün</td></tr>`;
+            }
+        });
+        document.getElementById('overdueTable').innerHTML = overdueHtml || "<tr><td style='color:#10b981'>Geciken kitap yok! 👏</td></tr>";
+    }
+
+    // --- KİTAP ARAMA VE LİSTELEME ---
+    function searchBooks(query) {
+        query = query.toLowerCase();
+        const filtered = allData.books.filter(b => 
+            (b.title && b.title.toLowerCase().includes(query)) ||
+            (b.shelf && b.shelf.toLowerCase().includes(query)) ||
+            (b.barcode && b.barcode.toString().includes(query))
+        );
+        renderBooks(filtered);
+    }
+
+    function renderBooks(bookList) {
+        const listToRender = bookList.length > 50 && document.getElementById('bookSearch').value === '' 
+            ? bookList.slice(-50).reverse() 
+            : bookList.slice().reverse();
+
+        let html = "";
+        listToRender.forEach(b => {
+            html += `<tr><td><b>${b.title}</b><br><small style="color:#64748b">${b.barcode}</small> <span style="background:#f1f5f9; color:#475569; padding:2px 6px; border-radius:6px; font-size:0.75em; font-weight:bold;">${b.shelf}</span></td><td style="text-align:center; font-weight:bold; color:#1e40af;">${b.stock}</td><td><button class="btn-red" onclick="deleteBook('${b.id}')"><i class="fas fa-trash"></i></button></td></tr>`;
+        });
+        document.getElementById('bookTable').innerHTML = html || "<tr><td style='text-align:center'>Kayıt bulunamadı</td></tr>";
+    }
+
+    // --- ÖDÜNÇ ARAMA VE LİSTELEME ---
+    function searchLoans(query) {
+        query = query.toLowerCase();
+        const activeLoans = allData.loans.filter(l => l.status === 'out' || l.status === 'Ödünçte');
+        const filtered = activeLoans.filter(l => 
+            (l.student && l.student.toLowerCase().includes(query)) ||
+            (l.title && l.title.toLowerCase().includes(query)) ||
+            (l.sClass && l.sClass.toLowerCase().includes(query))
+        );
+        renderLoans(filtered); 
+    }
+
+    function renderLoans(loanList) {
+        let listToRender = loanList;
+        if(loanList.some(l => l.status === 'returned' || l.status === 'İade Edildi')) {
+             listToRender = loanList.filter(l => l.status === 'out' || l.status === 'Ödünçte');
+        }
+        
+        let html = "";
+        listToRender.forEach(l => {
+            html += `<tr><td><b>${l.student}</b><br><small>${l.title}</small></td><td><button class="btn-green" style="padding:6px 12px; font-size:0.85rem" onclick="returnBook('${l.id}', '${l.barcode}', '${l.no}', '${l.student}', '${l.sClass}')">Teslim</button></td></tr>`;
+        });
+        document.getElementById('loanTable').innerHTML = html || "<tr><td style='text-align:center'>Ödünç kaydı yok</td></tr>";
+    }
+
+    // --- EXCEL EXPORT FONKSİYONU ---
+    function exportToExcel(type) {
+        let data = [];
+        let filename = "kutuphane_verisi.xlsx";
+
+        if (type === 'stock') {
+            filename = "Tum_Kitap_Stogu.xlsx";
+            // Kitap verisini hazırla
+            data = allData.books.map(b => ({
+                "Barkod": b.barcode,
+                "Kitap Adı": b.title,
+                "Konum": b.shelf,
+                "Stok": b.stock
+            }));
+        } else if (type === 'topStudents') {
+            filename = "En_Cok_Okuyanlar.xlsx";
+            let sortedStudents = [...allData.students].sort((a,b) => (parseInt(b.score)||0) - (parseInt(a.score)||0));
+            data = sortedStudents.map(s => ({
+                "Öğrenci Adı": s.name,
+                "Sınıf": s.sClass,
+                "Okul No": s.no,
+                "Puan": s.score
+            }));
+        } else if (type === 'overdue') {
+            filename = "Geciken_Kitaplar.xlsx";
+            const now = new Date();
+            let overdueLoans = allData.loans.filter(l => l.status === 'out' || l.status === 'Ödünçte').filter(l => {
+                 return Math.floor((now - new Date(l.date)) / (86400000)) > 15;
+            });
+            data = overdueLoans.map(l => ({
+                "Öğrenci": l.student,
+                "Sınıf": l.sClass,
+                "Kitap": l.title,
+                "Alış Tarihi": l.date,
+                "Gecikme (Gün)": Math.floor((now - new Date(l.date)) / (86400000))
+            }));
+        }
+
+        if(data.length === 0) {
+            uiAlert("İndirilecek veri bulunamadı!", 'error');
+            return;
+        }
+
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Veriler");
+        XLSX.writeFile(wb, filename);
+    }
+
+    async function sendApi(type) {
+        let payload = {};
+        if(type === 'addBook') {
+            // HEM SEÇİLEN HEM YAZILAN DEĞERİ ALMAK İÇİN INPUT VALUE KULLANIYORUZ
+            const cat = document.getElementById('bCategory').value;
+            const shelfNo = document.getElementById('bShelfNo').value;
+            
+            // Eğer kategori veya raf boşsa uyarı ver, ama manuel yazılanı kabul et
+            if(!cat || !shelfNo) return uiAlert("Lütfen Kategori ve Raf giriniz!", 'error');
+
+            const fullShelf = `${cat} - ${shelfNo}`;
+
+            payload = {
+                barcode: document.getElementById('bBarcode').value,
+                title: document.getElementById('bTitle').value,
+                shelf: fullShelf,
+                stock: document.getElementById('bStock').value
+            };
+            
+            if(!payload.barcode || !payload.title) return uiAlert("Barkod ve İsim zorunlu!", 'error');
+
+        } else if(type === 'loanBook') {
+            payload = {
+                student: document.getElementById('lStudent').value,
+                no: document.getElementById('lNo').value,
+                sClass: document.getElementById('lClass').value,
+                barcode: document.getElementById('lBarcode').value
+            };
+            if(!payload.barcode || !payload.student) return uiAlert("Eksik bilgi!", 'error');
+        }
+        const res = await callBackend(type, payload);
+        if(res) {
+            uiAlert(res);
+            document.querySelectorAll('input').forEach(i => i.value = '');
+            document.getElementById('bStock').value = 1;
+            refreshData();
+        }
+    }
+
+    async function deleteBook(id) {
+        if(await uiConfirm("Kitap silinsin mi?")) {
+            const res = await callBackend('deleteBook', {id: id});
+            if(res) refreshData();
+        }
+    }
+
+    async function returnBook(id, barcode, no, student, sClass) {
+        if(await uiConfirm("Kitap teslim alınıyor, onaylıyor musun?")) {
+            const res = await callBackend('returnBook', {loanId: id, barcode: barcode, no: no, student: student, sClass: sClass});
+            if(res) { uiAlert(res); refreshData(); }
+        }
+    }
+
+    function fetchGoogleBook(isbn) {
+        if(!isbn) return;
+        document.getElementById('bTitle').placeholder = "Aranıyor...";
+        
+        fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`)
+            .then(r => r.json())
+            .then(d => {
+                if(d.totalItems > 0) {
+                    const info = d.items[0].volumeInfo;
+                    document.getElementById('bTitle').value = info.title + (info.authors ? " - " + info.authors[0] : "");
+                } else { 
+                    document.getElementById('bTitle').placeholder = "Bulunamadı, manuel giriniz"; 
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                document.getElementById('bTitle').placeholder = "Bağlantı hatası, manuel giriniz";
+            });
+    }
+
+    function nav(pageId, el) {
+        document.querySelectorAll('.page').forEach(x => x.classList.remove('active'));
+        document.querySelectorAll('.nav-item').forEach(x => x.classList.remove('active'));
+        document.getElementById(pageId).classList.add('active');
+        el.classList.add('active');
+        if(pageId === 'dashboard') refreshData();
+    }
+
+    let scanner = null;
+    function startScan(targetId) {
+        document.getElementById('scanner-overlay').style.display = 'flex';
+        
+        if(scanner) { scanner.clear(); }
+
+        scanner = new Html5Qrcode("reader");
+        const config = { fps: 20, qrbox: {width:250, height:150} };
+        
+        scanner.start({ facingMode: "environment" }, config, onScanSuccess)
+        .catch(err => {
+            scanner.start({ facingMode: "user" }, config, onScanSuccess);
+        });
+
+        function onScanSuccess(text) {
+            document.getElementById(targetId).value = text;
+            stopScanner();
+            if(targetId === 'bBarcode') fetchGoogleBook(text);
+        }
+    }
+    
+    function stopScanner() { 
+        if(scanner) scanner.stop().then(() => { 
+            scanner.clear(); 
+            document.getElementById('scanner-overlay').style.display = 'none'; 
+        }).catch(err => {
+             document.getElementById('scanner-overlay').style.display = 'none'; 
+        }); 
+    }
+</script>
+</body>
+</html>
